@@ -1,17 +1,19 @@
+require 'parallel'
+require 'ruby-progressbar'
 module Mongify
   class Translation
     #
     # This module does the processing on the translation object
     #
     module ProcessorCommon
-      attr_accessor :sql_connection, :no_sql_connection
+      attr_accessor :sql_connection, :no_sql_connection, :processes
 
       #########
       protected
       #########
 
       # Prepares connections for process & sync
-      def prepare_connections(sql_connection, no_sql_connection)
+      def prepare_connections(sql_connection, no_sql_connection, options)
         raise Mongify::SqlConnectionRequired, "Can only read from Mongify::Database::SqlConnection" unless sql_connection.is_a?(Mongify::Database::SqlConnection)
         raise Mongify::NoSqlConnectionRequired, "Can only write to Mongify::Database::NoSqlConnection" unless no_sql_connection.is_a?(Mongify::Database::NoSqlConnection)
 
@@ -22,20 +24,21 @@ module Mongify
 
         no_sql_connection.ask_to_drop_database if no_sql_connection.forced?
 
+        self.processes = options[:processes] ? options[:processes] : 2
       end
 
       # Setups up pre_mongifed_id as an index to speed up lookup performance
       def setup_db_index
-        self.copy_tables.each do |t|
+        Parallel.each(self.copy_tables, in_processes: self.processes) do |t|
           no_sql_connection.create_pre_mongified_id_index(t.name)
         end
       end
 
       # Does a copy of the embedded tables
       def copy_embedded_tables
-        self.embed_tables.each do |t|
+        Parallel.each(self.embed_tables, in_processes: self.processes, progress:'Embedding') do |t|
           sql_connection.select_rows(t.sql_name) do |rows, page, total_pages|
-            Mongify::Status.publish('copy_embedded', :size => rows.count, :name => "Embedding #{t.name} (#{page}/#{total_pages})", :action => 'add')
+            # Mongify::Status.publish('copy_embedded', :size => rows.count, :name => "Embedding #{t.name} (#{page}/#{total_pages})", :action => 'add')
             rows.each do |row|
               target_row = no_sql_connection.find_one(t.embed_in, {:pre_mongified_id => get_type_casted_value(t, t.embed_on, row)})
               next unless target_row.present?
@@ -49,19 +52,19 @@ module Mongify
               row.delete('pre_mongified_id')
               save_function_call = t.embedded_as_object? ? '$set' : '$addToSet'
               no_sql_connection.connection[t.embed_in].update_one( { "_id" => target_row['_id'] }, append_parent_object({save_function_call => {t.name => row}}, parent_row, unset_keys))
-              Mongify::Status.publish('copy_embedded')
+            #   Mongify::Status.publish('copy_embedded')
             end
-            Mongify::Status.publish('copy_embedded', :action => 'finish')
+            # Mongify::Status.publish('copy_embedded', :action => 'finish')
           end
         end
       end
 
       # Moves over polymorphic data
       def copy_polymorphic_tables
-        self.polymorphic_tables.each do |t|
+        Parallel.each(self.polymorphic_tables, in_processes: self.processes, progress:'Polymorphicizing') do |t|
           polymorphic_id_col, polymorphic_type_col = "#{t.polymorphic_as}_id", "#{t.polymorphic_as}_type"
           sql_connection.select_rows(t.sql_name) do |rows, page, total_pages|
-            Mongify::Status.publish('copy_polymorphic', :size => rows.count, :name => "Polymorphicizing #{t.name}", :action => 'add')
+            # Mongify::Status.publish('copy_polymorphic', :size => rows.count, :name => "Polymorphicizing #{t.name}", :action => 'add')
             rows.each do |row|
 
               #If no data is in the column, skip importing
@@ -84,9 +87,9 @@ module Mongify
                 no_sql_connection.insert_into(t.name, row)
               end
 
-              Mongify::Status.publish('copy_polymorphic')
+            #   Mongify::Status.publish('copy_polymorphic')
             end
-            Mongify::Status.publish('copy_polymorphic', :action => 'finish')
+            # Mongify::Status.publish('copy_polymorphic', :action => 'finish')
           end
         end
       end
@@ -111,10 +114,10 @@ module Mongify
 
       # Removes 'pre_mongiifed_id's from all collection
       def remove_pre_mongified_ids
-        self.copy_tables.each do |t|
-          Mongify::Status.publish('remove_pre_mongified', :size => 1, :name => "Removing pre_mongified_id #{t.name}", :action => 'add')
+        Parallel.each(self.copy_tables, in_processes: self.processes, progress:'Removing pre_mongified_id') do |t|
+        #   Mongify::Status.publish('remove_pre_mongified', :size => 1, :name => "Removing pre_mongified_id #{t.name}", :action => 'add')
           no_sql_connection.remove_pre_mongified_ids(t.name)
-          Mongify::Status.publish('remove_pre_mongified', :action => 'finish')
+        #   Mongify::Status.publish('remove_pre_mongified', :action => 'finish')
         end
       end
 

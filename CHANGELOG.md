@@ -1,5 +1,8 @@
 # Mongify ChangeLog
 
+## 1.4.1 / 2019
+* Added support for Parallel in process
+
 ## 1.4.0 / 25 June 2017
 * Added support for ActiveRecord/ActiveSupport 5.0
 * Added support for newer versions of MongoDB (3.2+) via the new ruby Mongo driver (version 2)

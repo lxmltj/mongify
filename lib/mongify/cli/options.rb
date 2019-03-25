@@ -6,6 +6,7 @@ module Mongify
     #
     class Options
       def initialize(argv)
+        @options = Hash.new()
         @parsed = false
         @argv = argv
         @parser = OptionParser.new
@@ -27,7 +28,7 @@ Examples:
 
 #{progname} check database.config
 #{progname} translation datbase.config > database_translation.rb
-#{progname} process database.config database_translation.rb
+#{progname} process database.config database_translation.rb --processes=4
 #{progname} sync database.config database_translation.rb
 
 See http://github.com/anlek/mongify for more details
@@ -46,6 +47,9 @@ EOB
         @parser.on("-v", "--version", "Show version") do
           @command_class = Command::Version
         end
+        @parser.on("-p Processes", "--processes Processes", "Processes use, 2 cpus by defaults") do |value|
+            @options[:processes] = Integer(value) rescue 2
+        end
       end
 
       # Parses CLI passed attributes and figures out what command user is trying to run
@@ -55,7 +59,7 @@ EOB
         elsif @command_class == Command::Version
           Command::Version.new(@parser.program_name)
         else
-          Command::Worker.new(action, config_file, translation_file, @parser)
+          Command::Worker.new(action, config_file, translation_file, @parser, @options)
         end
       end
 

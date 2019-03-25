@@ -37,11 +37,12 @@ module Mongify
           'unknown'
         end
 
-        def initialize(command, config=nil, translation_file=nil, parser="")
+        def initialize(command, config=nil, translation_file=nil, parser="", options=nil)
           @command = command.to_s.downcase
           @config = config
           @translation_file = translation_file
           @parser = parser
+          @options = options
         end
 
         #Executes the worked based on a given command
@@ -69,7 +70,7 @@ module Mongify
             view.output("NoSQL connection works") if check_nosql_connection
           when :process
             check_connections
-            @translation.process(@config.sql_connection, @config.no_sql_connection)
+            @translation.process(@config.sql_connection, @config.no_sql_connection, @options)
           when :sync
             check_connections
             @translation.sync(@config.sql_connection, @config.no_sql_connection)
