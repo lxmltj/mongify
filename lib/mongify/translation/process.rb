@@ -56,26 +56,12 @@ module Mongify
 
       # Updates the reference ids in the no sql database
       def update_reference_ids
-        copy_tables_parallel = self.copy_tables.reject{|t| t.parallel_update?}
-        if copy_tables_parallel
-          Parallel.each(copy_tables_parallel, in_processes: self.processes, progress:"Updating References Parallel (CPUs: #{self.processes}, Tables: #{copy_tables_parallel.count})") do |t|
-            rows = no_sql_connection.select_rows(t.name)
-            rows.each do |row|
-              id = row["_id"]
-              attributes = fetch_reference_ids(t, row)
-              no_sql_connection.connection[t.name].update_one( { "_id" => id } , { "$set"  => attributes}) unless attributes.blank?
-            end
-          end
-        end
-        copy_tables_non_parallel = self.copy_tables.reject{|t| !t.parallel_update?}
-        if copy_tables_non_parallel
-          copy_tables_non_parallel.each do |t|
-            rows = no_sql_connection.select_rows(t.name)
-            Parallel.map(rows, in_processes: self.processes, progress:"Updating References #{t.name} (CPUs: #{self.processes})") do |row|
-              id = row["_id"]
-              attributes = fetch_reference_ids(t, row)
-              no_sql_connection.connection[t.name].update_one( { "_id" => id } , { "$set"  => attributes}) unless attributes.blank?
-            end
+        Parallel.each(self.copy_tables, in_processes: self.processes, progress:"Updating References Parallel (CPUs: #{self.processes}, Tables: #{copy_tables_parallel.count})") do |t|
+          rows = no_sql_connection.select_rows(t.name)
+          rows.each do |row|
+            id = row["_id"]
+            attributes = fetch_reference_ids(t, row)
+            no_sql_connection.connection[t.name].update_one( { "_id" => id } , { "$set"  => attributes}) unless attributes.blank?
           end
         end
       end
