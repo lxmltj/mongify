@@ -36,7 +36,7 @@ module Mongify
 
       # Does a copy of the embedded tables
       def copy_embedded_tables
-        embed_tables_parallel = self.embed_tables.reject{|t| t.parallel?}
+        embed_tables_parallel = self.embed_tables.reject{|t| t.parallel_copy?}
         if embed_tables_parallel
           Parallel.each(embed_tables_parallel, in_processes: self.processes, progress:"Embedding Parallel (CPUs: #{self.processes}, Tables: #{embed_tables_parallel.count})") do |t|
             sql_connection.select_rows(t.sql_name) do |rows, page, total_pages|
@@ -57,7 +57,7 @@ module Mongify
             end
           end
         end
-        embed_tables_non_parallel = self.embed_tables.reject{|t| !t.parallel?}
+        embed_tables_non_parallel = self.embed_tables.reject{|t| !t.parallel_copy?}
         if embed_tables_non_parallel
           embed_tables_non_parallel.each do |t|
             row_count = sql_connection.count(t.sql_name)

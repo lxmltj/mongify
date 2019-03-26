@@ -175,8 +175,12 @@ module Mongify
       end
 
       # Parallel
-      def parallel?
-        @options['parallel'].present?
+      def parallel_copy?
+        @options['parallel_copy'].present?
+      end
+
+      def parallel_update?
+        @options['parallel_update'].present?
       end
 
       #######
