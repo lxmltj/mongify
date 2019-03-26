@@ -122,7 +122,7 @@ module Mongify
 
       # Returns a hash of all the rows from the database of a given collection
       def select_rows(collection)
-        db[collection].find({}).no_cursor_timeout
+        db[collection].find().no_cursor_timeout
       end
 
       def select_by_query(collection, query)
@@ -165,12 +165,12 @@ module Mongify
 
       # Finds one item from a collection with the given query
       def find_one(collection_name, query)
-        db[collection_name].find(query).try(:first)
+        db[collection_name].find(query).no_cursor_timeout.try(:first)
       end
 
       # Returns a row of a item from a given collection with a given pre_mongified_id
       def get_id_using_pre_mongified_id(colleciton_name, pre_mongified_id)
-        db[colleciton_name].find('pre_mongified_id' => pre_mongified_id).try(:first).try(:[], '_id')
+        db[colleciton_name].find('pre_mongified_id' => pre_mongified_id).no_cursor_timeout.try(:first).try(:[], '_id')
       end
 
       # Removes pre_mongified_id from all records in a given collection
