@@ -36,25 +36,49 @@ module Mongify
 
       # Does a copy of the embedded tables
       def copy_embedded_tables
-        Parallel.each(self.embed_tables, in_processes: self.processes, progress:'Embedding') do |t|
-          sql_connection.select_rows(t.sql_name) do |rows, page, total_pages|
-            # Mongify::Status.publish('copy_embedded', :size => rows.count, :name => "Embedding #{t.name} (#{page}/#{total_pages})", :action => 'add')
-            rows.each do |row|
-              target_row = no_sql_connection.find_one(t.embed_in, {:pre_mongified_id => get_type_casted_value(t, t.embed_on, row)})
-              next unless target_row.present?
-              row, parent_row, unset_keys = t.translate(row, target_row)
-              parent_row ||= {}
-              parent_row.delete("_id")
-              parent_row.delete(t.name.to_s)
-              unset_keys ||= {}
-              row.delete(t.embed_on)
-              row.merge!(fetch_reference_ids(t, row))
-              row.delete('pre_mongified_id')
-              save_function_call = t.embedded_as_object? ? '$set' : '$addToSet'
-              no_sql_connection.connection[t.embed_in].update_one( { "_id" => target_row['_id'] }, append_parent_object({save_function_call => {t.name => row}}, parent_row, unset_keys))
-            #   Mongify::Status.publish('copy_embedded')
+        embed_tables_parallel = self.embed_tables.reject{|t| t.parallel?}
+        if embed_tables_parallel
+          Parallel.each(embed_tables_parallel, in_processes: self.processes, progress:"Embedding Parallel (CPUs: #{self.processes}, Tables: #{embed_tables_parallel.count})") do |t|
+            sql_connection.select_rows(t.sql_name) do |rows, page, total_pages|
+              rows.each do |row|
+                target_row = no_sql_connection.find_one(t.embed_in, {:pre_mongified_id => row[t.embed_on]})
+                next unless target_row.present?
+                row, parent_row, unset_keys = t.translate(row, target_row)
+                parent_row ||= {}
+                parent_row.delete("_id")
+                parent_row.delete(t.name.to_s)
+                unset_keys ||= {}
+                row.delete(t.embed_on)
+                row.merge!(fetch_reference_ids(t, row))
+                row.delete('pre_mongified_id')
+                save_function_call = t.embedded_as_object? ? '$set' : '$addToSet'
+                no_sql_connection.update(t.embed_in, target_row['_id'], append_parent_object({save_function_call => {t.name => row}}, parent_row, unset_keys))
+              end
             end
-            # Mongify::Status.publish('copy_embedded', :action => 'finish')
+          end
+        end
+        embed_tables_non_parallel = self.embed_tables.reject{|t| !t.parallel?}
+        if embed_tables_non_parallel
+          embed_tables_non_parallel.each do |t|
+            row_count = sql_connection.count(t.sql_name)
+            pages = (row_count.to_f/sql_connection.batch_size).ceil
+            Parallel.each((1..pages), in_processes: self.processes, progress:"Embedding #{t.name} (CPUs: #{self.processes})") do |page|
+              rows = sql_connection.select_paged_rows(t.sql_name, sql_connection.batch_size, page)
+              rows.each do |row|
+                target_row = no_sql_connection.find_one(t.embed_in, {:pre_mongified_id => row[t.embed_on]})
+                next unless target_row.present?
+                row, parent_row, unset_keys = t.translate(row, target_row)
+                parent_row ||= {}
+                parent_row.delete("_id")
+                parent_row.delete(t.name.to_s)
+                unset_keys ||= {}
+                row.delete(t.embed_on)
+                row.merge!(fetch_reference_ids(t, row))
+                row.delete('pre_mongified_id')
+                save_function_call = t.embedded_as_object? ? '$set' : '$addToSet'
+                no_sql_connection.update(t.embed_in, target_row['_id'], append_parent_object({save_function_call => {t.name => row}}, parent_row, unset_keys))
+              end
+            end
           end
         end
       end

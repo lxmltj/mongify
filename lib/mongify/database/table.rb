@@ -174,6 +174,11 @@ module Mongify
         @before_save_callback = nil
       end
 
+      # Parallel
+      def parallel?
+        @options['parallel'].present?
+      end
+
       #######
       private
       #######

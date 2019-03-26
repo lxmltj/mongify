@@ -122,11 +122,11 @@ module Mongify
 
       # Returns a hash of all the rows from the database of a given collection
       def select_rows(collection)
-        db[collection].find
+        db[collection].find({}).no_cursor_timeout
       end
 
       def select_by_query(collection, query)
-        db[collection].find(query)
+        db[collection].find(query).no_cursor_timeout
       end
 
       # Inserts into the collection a given row
