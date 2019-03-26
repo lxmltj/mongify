@@ -27,7 +27,7 @@ module Mongify
       def copy_data
         copy_tables_parallel = self.copy_tables.reject{|t| t.parallel?}
         if copy_tables_parallel
-          Parallel.each(copy_tables_parallel, in_processes: self.processes, progress:"Copying Parallel (CPUSs: #{self.processes}, Tables: #{copy_tables_parallel.count})") do |t|
+          Parallel.each(copy_tables_parallel, in_processes: self.processes, progress:"Copying Parallel (CPUs: #{self.processes}, Tables: #{copy_tables_parallel.count})") do |t|
             sql_connection.select_rows(t.sql_name) do |rows, page, total_pages|   
               insert_rows = []     
               rows.each do |row|
