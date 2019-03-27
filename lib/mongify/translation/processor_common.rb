@@ -38,7 +38,7 @@ module Mongify
       def copy_embedded_tables
         embed_tables_parallel = self.embed_tables.reject{|t| t.parallel_copy?}
         if embed_tables_parallel
-          Parallel.each(embed_tables_parallel, in_processes: self.processes, progress:"Embedding Parallel (CPUs: #{self.processes}, Tables: #{embed_tables_parallel.count})") do |t|
+          Parallel.each(embed_tables_parallel, in_processes: self.processes, progress:"Embedding Parallel (Processes: #{self.processes}, Tables: #{embed_tables_parallel.count})") do |t|
             sql_connection.select_rows(t.sql_name) do |rows, page, total_pages|
               rows.each do |row|
                 target_row = no_sql_connection.find_one(t.embed_in, {:pre_mongified_id => row[t.embed_on]})
@@ -62,7 +62,7 @@ module Mongify
           embed_tables_non_parallel.each do |t|
             row_count = sql_connection.count(t.sql_name)
             pages = (row_count.to_f/sql_connection.batch_size).ceil
-            Parallel.each((1..pages), in_processes: self.processes, progress:"Embedding #{t.name} (CPUs: #{self.processes})") do |page|
+            Parallel.each((1..pages), in_processes: self.processes, progress:"Embedding #{t.name} (Processes: #{self.processes})") do |page|
               rows = sql_connection.select_paged_rows(t.sql_name, sql_connection.batch_size, page)
               rows.each do |row|
                 target_row = no_sql_connection.find_one(t.embed_in, {:pre_mongified_id => row[t.embed_on]})
@@ -138,7 +138,7 @@ module Mongify
 
       # Removes 'pre_mongiifed_id's from all collection
       def remove_pre_mongified_ids
-        Parallel.each(self.copy_tables, in_processes: self.processes, progress:"Removing pre_mongified_id (CPUs: #{self.processes}, Tables: #{self.copy_tables.count})") do |t|
+        Parallel.each(self.copy_tables, in_processes: self.processes, progress:"Removing pre_mongified_id (Processes: #{self.processes}, Tables: #{self.copy_tables.count})") do |t|
           no_sql_connection.remove_pre_mongified_ids(t.name)
         end
       end
