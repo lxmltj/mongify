@@ -85,10 +85,10 @@ module Mongify
 
       # Moves over polymorphic data
       def copy_polymorphic_tables
-        Parallel.each(self.polymorphic_tables, in_processes: self.processes, progress:'Polymorphicizing') do |t|
+        self.polymorphic_tables.each do |t|
           polymorphic_id_col, polymorphic_type_col = "#{t.polymorphic_as}_id", "#{t.polymorphic_as}_type"
           sql_connection.select_rows(t.sql_name) do |rows, page, total_pages|
-            # Mongify::Status.publish('copy_polymorphic', :size => rows.count, :name => "Polymorphicizing #{t.name}", :action => 'add')
+            Mongify::Status.publish('copy_polymorphic', :size => rows.count, :name => "Polymorphicizing #{t.name}", :action => 'add')
             rows.each do |row|
 
               #If no data is in the column, skip importing
@@ -111,9 +111,9 @@ module Mongify
                 no_sql_connection.insert_into(t.name, row)
               end
 
-            #   Mongify::Status.publish('copy_polymorphic')
+              Mongify::Status.publish('copy_polymorphic')
             end
-            # Mongify::Status.publish('copy_polymorphic', :action => 'finish')
+            Mongify::Status.publish('copy_polymorphic', :action => 'finish')
           end
         end
       end
@@ -138,10 +138,8 @@ module Mongify
 
       # Removes 'pre_mongiifed_id's from all collection
       def remove_pre_mongified_ids
-        Parallel.each(self.copy_tables, in_processes: self.processes, progress:'Removing pre_mongified_id') do |t|
-        #   Mongify::Status.publish('remove_pre_mongified', :size => 1, :name => "Removing pre_mongified_id #{t.name}", :action => 'add')
+        Parallel.each(self.copy_tables, in_processes: self.processes, progress:"Removing pre_mongified_id (CPUs: #{self.processes}, Tables: #{self.copy_tables.count})") do |t|
           no_sql_connection.remove_pre_mongified_ids(t.name)
-        #   Mongify::Status.publish('remove_pre_mongified', :action => 'finish')
         end
       end
 
