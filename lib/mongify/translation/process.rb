@@ -56,7 +56,7 @@ module Mongify
 
       # Updates the reference ids in the no sql database
       def update_reference_ids
-        Parallel.each(self.copy_tables, in_threads: self.processes, progress:"Updating References Parallel (CPUs: #{self.processes}, Tables: #{self.copy_tables.count})") do |t|
+        Parallel.each(self.copy_tables, in_threads: self.copy_tables.count, progress:"Updating References Parallel (Tables: #{self.copy_tables.count})") do |t|
           no_sql_connection.connection[t.name].find.no_cursor_timeout.each do |row|
             id = row["_id"]
             attributes = fetch_reference_ids(t, row)
